@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1a1208">
+<title>Dig Dug</title>
+<style>
+  :root { --soil:#9b5a2a; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{
+    margin:0; padding:0; height:100%; overflow:hidden;
+    background:#0c0a08; color:#fff;
+    font-family:"Segoe UI",system-ui,Arial,sans-serif;
+    user-select:none; -webkit-user-select:none; touch-action:none;
+  }
+  #wrap{
+    position:fixed; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:flex-start;
+  }
+  #hud{
+    width:100%; max-width:720px; display:flex; justify-content:space-between;
+    align-items:center; padding:6px 12px; font-size:15px; font-weight:700;
+    letter-spacing:.5px; text-shadow:0 1px 2px #000;
+  }
+  #hud .seg{display:flex; gap:14px; align-items:center;}
+  #score{color:#ffd34d;}
+  #hi{color:#ffb84d; font-size:12px; margin-left:8px; opacity:.85;}
+  #lives{color:#ff7a7a;}
+  #level{color:#7ad1ff;}
+  #mons{color:#9bf06b; font-size:13px;}
+  #mute{background:none; border:none; cursor:pointer; font-size:18px; padding:0 2px;
+    line-height:1; filter:saturate(.9);}
+  /* high score table */
+  .hs{ width:100%; max-width:300px; margin:2px auto 0; }
+  .hstitle{ color:#ffd34d; font-weight:800; letter-spacing:3px; margin-bottom:6px; font-size:15px;}
+  .hsrow{ display:flex; align-items:center; gap:10px; padding:3px 10px; border-radius:6px;
+    color:#e9d9c2; font-size:15px;}
+  .hsrow .hsrank{ width:18px; text-align:left; color:#9c8d77; }
+  .hsrow .hsname{ flex:1; text-align:left; letter-spacing:2px; }
+  .hsrow .hsscore{ color:#ffd34d; font-variant-numeric:tabular-nums; font-weight:700;}
+  .hsrow.hsnew{ background:rgba(255,211,77,.2); color:#fff; }
+  .hsempty{ color:#9c8d77; font-size:13px; }
+  #initials{ font-size:26px; text-align:center; letter-spacing:8px; padding:8px 10px;
+    width:170px; border-radius:8px; border:2px solid #ffce4d; background:#1a1208;
+    color:#fff; text-transform:uppercase; outline:none; }
+  canvas{
+    display:block; background:#1a1208; image-rendering:pixelated;
+    border:2px solid #3a2a16; border-radius:6px; touch-action:none;
+    max-width:100%;
+  }
+  #stage{position:relative; display:flex; justify-content:center; width:100%;}
+  /* overlay messages */
+  #overlay{
+    position:absolute; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center;
+    background:rgba(8,6,4,.78); border-radius:6px; gap:14px; padding:20px;
+  }
+  #overlay h1{margin:0; font-size:40px; color:#ffd34d; letter-spacing:2px;
+    text-shadow:0 3px 0 #b3791a;}
+  #overlay p{margin:0; font-size:15px; max-width:340px; line-height:1.5; color:#e9d9c2;}
+  #overlay .big{font-size:30px; color:#ff8d5a;}
+  .btn{
+    background:linear-gradient(#ffce4d,#f0a020); color:#3a2400; border:none;
+    padding:13px 26px; font-size:18px; font-weight:800; border-radius:30px;
+    cursor:pointer; box-shadow:0 4px 0 #a86a10; letter-spacing:1px;
+  }
+  .btn:active{transform:translateY(3px); box-shadow:0 1px 0 #a86a10;}
+  .hidden{display:none !important;}
+  /* touch controls */
+  #touch{
+    width:100%; max-width:720px; flex:1; display:flex; align-items:center;
+    justify-content:space-between; gap:8px;
+    padding:10px clamp(8px,3vw,22px) 20px; min-height:0; overflow:hidden;
+  }
+  #dpad{position:relative; width:clamp(108px,40vw,168px); aspect-ratio:1/1;
+    flex:0 0 auto; touch-action:none;}
+  .dbtn{
+    position:absolute; width:33.34%; height:33.34%; background:rgba(255,255,255,.12);
+    border:2px solid rgba(255,255,255,.28); border-radius:14px; display:flex;
+    align-items:center; justify-content:center; font-size:clamp(15px,5vw,24px); color:#fff;
+  }
+  .dbtn:active,.dbtn.on{background:rgba(255,211,77,.5);}
+  #up{top:0; left:33.33%;} #down{bottom:0; left:33.33%;}
+  #left{left:0; top:33.33%;} #right{right:0; top:33.33%;}
+  #pump{
+    width:clamp(76px,26vw,108px); aspect-ratio:1/1; flex:0 0 auto; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#ff9a5a,#e2502a);
+    border:3px solid #ffb98a; color:#fff; font-size:17px; font-weight:800;
+    display:flex; align-items:center; justify-content:center; text-align:center;
+    box-shadow:0 5px 0 #9c3216; line-height:1.1;
+  }
+  #pump:active,#pump.on{transform:translateY(3px); box-shadow:0 2px 0 #9c3216;}
+  #hint{font-size:12px; color:#9c8d77; text-align:center; padding:2px 0 8px;}
+  @media (min-width:860px){ #touch{display:none;} }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud">
+    <div class="seg"><span id="score">0</span><span id="hi">HI 0</span></div>
+    <div class="seg"><span id="level">RD 1</span><span id="mons"></span></div>
+    <div class="seg"><span id="lives">♥♥♥</span><button id="mute" title="Sound on/off">🔊</button></div>
+  </div>
+  <div id="stage">
+    <canvas id="game"></canvas>
+    <div id="overlay">
+      <h1>DIG DUG</h1>
+      <p>Dig tunnels through the dirt. Pump up monsters until they pop, or drop rocks to crush them. Clear every monster to advance.</p>
+      <p style="color:#9ec4ff">PC: Arrow keys / WASD to move · Space to pump<br>Phone: D‑pad to move · PUMP button</p>
+      <div id="hsBox"></div>
+      <button class="btn" id="startBtn">START</button>
+    </div>
+  </div>
+  <div id="touch">
+    <div id="dpad">
+      <div class="dbtn" id="up" data-dir="up">▲</div>
+      <div class="dbtn" id="left" data-dir="left">◀</div>
+      <div class="dbtn" id="right" data-dir="right">▶</div>
+      <div class="dbtn" id="down" data-dir="down">▼</div>
+    </div>
+    <div id="pump">PUMP</div>
+  </div>
+  <div id="hint">Clear all monsters to advance to the next round</div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+// ---------- Grid config ----------
+const COLS = 14, ROWS = 18;      // playfield in tiles
+const SKY_ROWS = 2;              // top rows are open sky (no dirt)
+let TILE = 28;                   // pixel size, recomputed responsively
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+// ---------- State ----------
+const DIRT=0, EMPTY=1;
+let grid;                        // grid[r][c]
+let rocks=[];                    // {c,r, falling, shaking, t, y}
+let enemies=[];
+let harpoon=null;                // {segs, dir, x,y, target}
+let player;
+let score=0, lives=3, level=1;
+let running=false, paused=false;
+let levelTime=0, lastKillTime=0;   // seconds
+let flash=0, msg=null, msgT=0;
+let particles=[];
+let lastTime=0;
+let bonus=null;                    // center vegetable bonus item
+let rocksDropped=0, bonusDone=false;
+let speedMul=1, fygarFireFast=1;   // per-level difficulty multipliers
+
+// ---------- Bonus produce table (classic Dig Dug, by round) ----------
+const PRODUCE=[
+  {n:'CARROT',   v:400,  col:'#ff8a2a'},
+  {n:'TURNIP',   v:600,  col:'#f3eede'},
+  {n:'MUSHROOM', v:800,  col:'#e7553e'},
+  {n:'CUCUMBER', v:1000, col:'#4cae3e'},
+  {n:'EGGPLANT', v:2000, col:'#8a4fd0'},
+  {n:'PEPPER',   v:3000, col:'#37c24a'},
+  {n:'TOMATO',   v:4000, col:'#e6352b'},
+  {n:'ONION',    v:5000, col:'#d9c66a'},
+  {n:'PINEAPPLE',v:6000, col:'#f2c029'},
+  {n:'GALAXIAN', v:8000, col:'#36d0ff'}
+];
+
+const DIRS = {
+  up:{x:0,y:-1}, down:{x:0,y:1}, left:{x:-1,y:0}, right:{x:1,y:0}
+};
+
+// ---------- Responsive sizing ----------
+function resize(){
+  const stage = document.getElementById('stage');
+  const hud = document.getElementById('hud').offsetHeight;
+  const touchEl = document.getElementById('touch');
+  const isTouch = getComputedStyle(touchEl).display !== 'none';
+  const touchH = isTouch ? touchEl.offsetHeight + 40 : 60;
+  const availW = Math.min(window.innerWidth - 8, 720);
+  const availH = window.innerHeight - hud - touchH - 24;
+  let t = Math.floor(Math.min(availW / COLS, availH / ROWS));
+  t = Math.max(14, Math.min(t, 40));
+  TILE = t;
+  canvas.width = COLS*TILE;
+  canvas.height = ROWS*TILE;
+  canvas.style.width = (COLS*TILE)+'px';
+  canvas.style.height = (ROWS*TILE)+'px';
+}
+window.addEventListener('resize', ()=>{ resize(); draw(); });
+
+// ---------- Level setup ----------
+function buildLevel(){
+  grid = [];
+  for(let r=0;r<ROWS;r++){
+    grid[r]=[];
+    for(let c=0;c<COLS;c++){
+      grid[r][c] = (r<SKY_ROWS) ? EMPTY : DIRT;
+    }
+  }
+  rocks = [];
+  enemies = [];
+  particles = [];
+  harpoon = null;
+  bonus = null; rocksDropped = 0; bonusDone = false;
+
+  // ----- per-round difficulty -----
+  speedMul     = Math.min(1 + (level-1)*0.09, 1.75);   // monsters get faster
+  fygarFireFast= Math.min(1 + (level-1)*0.12, 2.2);    // Fygars breathe more
+
+  // player start: center column, near top of dirt
+  const pc = Math.floor(COLS/2), pr = SKY_ROWS+1;
+  player = {
+    c:pc, r:pr, x:pc, y:pr, dir:'down', moveDir:null,
+    px:0, py:0, anim:0, dead:false, pumping:false, invuln:90
+  };
+  for(let r=SKY_ROWS;r<=pr+1;r++) carve(pc,r); // entry shaft
+
+  // ----- procedurally place monsters (count grows each round) -----
+  const count = Math.min(4 + (level-1), 9);
+  // candidate chambers spread across the dirt, avoiding the central shaft
+  const rowsT=[6,9,12,15], spread=[2,4,COLS-3,COLS-5,Math.floor(COLS/2)-2,Math.floor(COLS/2)+2];
+  const cand=[];
+  for(const ry of rowsT) for(const cx of spread)
+    if(Math.abs(cx-pc)>1 && cx>=1 && cx<COLS-1) cand.push({c:cx,r:ry});
+  shuffle(cand);
+  // deeper rounds skew toward Fygars
+  const fygarChance = Math.min(0.25 + level*0.06, 0.6);
+  for(let i=0;i<count;i++){
+    const s = cand[i % cand.length];
+    carve(s.c, s.r);
+    carve(s.c + (s.c<COLS/2?1:-1), s.r);  // small chamber
+    const deep = s.r>=12;
+    const isFygar = deep && (Math.random()<fygarChance || (level>=2 && i%3===0));
+    enemies.push(makeEnemy(s.c, s.r, isFygar?'fygar':'pooka'));
+  }
+
+  // ----- rocks (more in later rounds) -----
+  const rockCount = Math.min(3 + Math.floor(level/2), 6);
+  const rockCols=[3,COLS-4,5,COLS-6,Math.floor(COLS/2)-3,Math.floor(COLS/2)+3];
+  shuffle(rockCols);
+  for(let i=0;i<rockCount;i++){
+    const c=rockCols[i % rockCols.length], r=SKY_ROWS+2+ (i%3);
+    if(grid[r] && grid[r][c]===DIRT && Math.abs(c-pc)>1){
+      rocks.push({c, r, y:r, falling:false, shaking:0, t:0, kills:0});
+    }
+  }
+}
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+function carve(c,r){
+  if(r>=0&&r<ROWS&&c>=0&&c<COLS) grid[r][c]=EMPTY;
+}
+
+function makeEnemy(c,r,type){
+  return {
+    c, r, x:c, y:r, nestC:c, nestR:r, type,
+    dir:'left', moveDir:'left',
+    inflate:0,           // 0..4, pop at >=4
+    inflateT:0,          // decay timer
+    state:'walk',        // walk | ghost | inflating | flee | dead
+    ghostT: 2 + Math.random()*4,
+    speed: (type==='fygar'?0.028:0.034) * speedMul,
+    fire:0, fireCd: 2+Math.random()*3,
+    anim:0, dead:false, escaped:false
+  };
+}
+
+// ---------- Helpers ----------
+function tileAt(c,r){
+  if(r<0||r>=ROWS||c<0||c>=COLS) return EMPTY;
+  return grid[r][c];
+}
+function rockAt(c,r){
+  return rocks.find(k=>!k.gone && Math.round(k.c)===c && Math.round(k.y)===r);
+}
+// nearest empty (tunnel) tile via expanding ring search
+function findNearestEmpty(c,r){
+  if(tileAt(c,r)===EMPTY) return {c,r};
+  for(let rad=1;rad<Math.max(COLS,ROWS);rad++){
+    for(let dr=-rad;dr<=rad;dr++){
+      for(let dc=-rad;dc<=rad;dc++){
+        if(Math.abs(dr)!==rad && Math.abs(dc)!==rad) continue;
+        const nc=c+dc, nr=r+dr;
+        if(nc>=0&&nc<COLS&&nr>=SKY_ROWS&&nr<ROWS&&tileAt(nc,nr)===EMPTY)
+          return {c:nc,r:nr};
+      }
+    }
+  }
+  return {c:Math.round(player.x), r:Math.round(player.y)};
+}
+
+// ---------- Input ----------
+const keys = {};
+const held = {up:false,down:false,left:false,right:false};
+let pumpHeld = false;
+
+window.addEventListener('keydown', e=>{
+  // don't hijack typing in a text field (e.g. high-score initials)
+  if(document.activeElement && document.activeElement.tagName==='INPUT') return;
+  const k=e.key.toLowerCase();
+  if(['arrowup','arrowdown','arrowleft','arrowright',' ','w','a','s','d'].includes(k)) e.preventDefault();
+  if(k==='arrowup'||k==='w') held.up=true;
+  if(k==='arrowdown'||k==='s') held.down=true;
+  if(k==='arrowleft'||k==='a') held.left=true;
+  if(k==='arrowright'||k==='d') held.right=true;
+  if(k===' ') pumpHeld=true;
+  if(k==='enter' && !running) startGame();
+});
+window.addEventListener('keyup', e=>{
+  const k=e.key.toLowerCase();
+  if(k==='arrowup'||k==='w') held.up=false;
+  if(k==='arrowdown'||k==='s') held.down=false;
+  if(k==='arrowleft'||k==='a') held.left=false;
+  if(k==='arrowright'||k==='d') held.right=false;
+  if(k===' ') pumpHeld=false;
+});
+
+// touch dpad
+function bindDir(id){
+  const el=document.getElementById(id);
+  const dir=el.dataset.dir;
+  const on=e=>{e.preventDefault(); held[dir]=true; el.classList.add('on');};
+  const off=e=>{e.preventDefault(); held[dir]=false; el.classList.remove('on');};
+  el.addEventListener('touchstart',on,{passive:false});
+  el.addEventListener('touchend',off,{passive:false});
+  el.addEventListener('touchcancel',off,{passive:false});
+  el.addEventListener('mousedown',on);
+  el.addEventListener('mouseup',off);
+  el.addEventListener('mouseleave',off);
+}
+['up','down','left','right'].forEach(bindDir);
+
+const pumpBtn=document.getElementById('pump');
+const pOn=e=>{e.preventDefault(); pumpHeld=true; pumpBtn.classList.add('on');};
+const pOff=e=>{e.preventDefault(); pumpHeld=false; pumpBtn.classList.remove('on');};
+pumpBtn.addEventListener('touchstart',pOn,{passive:false});
+pumpBtn.addEventListener('touchend',pOff,{passive:false});
+pumpBtn.addEventListener('touchcancel',pOff,{passive:false});
+pumpBtn.addEventListener('mousedown',pOn);
+pumpBtn.addEventListener('mouseup',pOff);
+pumpBtn.addEventListener('mouseleave',pOff);
+
+document.getElementById('startBtn').addEventListener('click', startGame);
+
+// ---------- Player update ----------
+const SPEED = 0.10; // tiles per frame at 60fps-ish (scaled by dt)
+
+function updatePlayer(dt){
+  if(player.dead) return;
+  if(player.invuln>0) player.invuln-=dt;
+  // choose desired dir from held keys
+  let want=null;
+  if(held.up) want='up'; else if(held.down) want='down';
+  else if(held.left) want='left'; else if(held.right) want='right';
+
+  const moving = (Math.abs(player.x-player.c)>0.001 || Math.abs(player.y-player.r)>0.001);
+
+  if(!moving){
+    player.c = Math.round(player.x); player.r=Math.round(player.y);
+    if(want){
+      player.dir=want;
+      const d=DIRS[want];
+      const nc=player.c+d.x, nr=player.r+d.y;
+      // blocked by border or rock
+      if(nc>=0&&nc<COLS&&nr>=0&&nr<ROWS && !rockAt(nc,nr)){
+        player.moveDir=want;
+        player.tc=nc; player.tr=nr;
+      }
+    }
+  }
+  // animate toward target
+  if(player.moveDir){
+    const d=DIRS[player.moveDir];
+    const step = SPEED * dt;
+    player.x += d.x*step; player.y += d.y*step;
+    player.anim += dt*0.3;
+    // dig the dirt at current rounded position
+    const cc=Math.round(player.x), rr=Math.round(player.y);
+    if(tileAt(cc,rr)===DIRT){ grid[rr][cc]=EMPTY; spawnDirt(cc,rr); sfx('dig'); }
+    // reached target?
+    if((d.x!==0 && Math.abs(player.x-player.tc)<step) ||
+       (d.y!==0 && Math.abs(player.y-player.tr)<step) || step===0){
+      player.x=player.tc; player.y=player.tr;
+      player.c=player.tc; player.r=player.tr;
+      player.moveDir=null;
+    }
+  }
+
+  // pump action
+  if(pumpHeld){
+    if(!harpoon){ fireHarpoon(); }
+  }
+}
+
+function fireHarpoon(){
+  const d=DIRS[player.dir];
+  harpoon = { dir:player.dir, len:0, maxLen:3.4, x:player.x, y:player.y,
+              tip:{x:player.x,y:player.y}, hit:null, grow:true, t:0 };
+  sfx('shoot');
+}
+
+function updateHarpoon(dt){
+  if(!harpoon) return;
+  const d=DIRS[harpoon.dir];
+  if(harpoon.grow && !harpoon.hit){
+    harpoon.len += 0.30*dt;
+    if(harpoon.len>harpoon.maxLen) harpoon.len=harpoon.maxLen;
+    harpoon.tip.x = player.x + d.x*harpoon.len;
+    harpoon.tip.y = player.y + d.y*harpoon.len;
+    // blocked by dirt or border -> retract
+    const tc=Math.round(harpoon.tip.x), tr=Math.round(harpoon.tip.y);
+    if(tc<0||tc>=COLS||tr<0||tr>=ROWS || tileAt(tc,tr)===DIRT){
+      harpoon.len -= 0.30*dt; harpoon.grow=false;
+    }
+    // hit enemy?
+    for(const e of enemies){
+      if(e.dead) continue;
+      if(Math.abs(e.x-harpoon.tip.x)<0.6 && Math.abs(e.y-harpoon.tip.y)<0.6){
+        harpoon.hit=e; e.state='inflating'; break;
+      }
+    }
+    if(harpoon.len>=harpoon.maxLen) harpoon.grow=false;
+  }
+
+  if(harpoon.hit){
+    const e=harpoon.hit;
+    if(e.dead){ harpoon=null; return; }
+    // keep tip on enemy
+    harpoon.tip.x=e.x; harpoon.tip.y=e.y;
+    if(pumpHeld){
+      harpoon.t+=dt;
+      if(harpoon.t>6){ // pump pulse
+        harpoon.t=0;
+        e.inflate++; e.inflateT=0;
+        spawnPop(e.x,e.y, e.inflate);
+        sfx('pump');
+        if(e.inflate>=4){ popEnemy(e); harpoon=null; return; }
+      }
+    }
+    // player stops pumping: keep harpoon attached but enemy slowly deflates handled elsewhere
+    if(!pumpHeld){
+      // release after short grace
+      harpoon.release=(harpoon.release||0)+dt;
+      if(harpoon.release>8){ harpoon=null; }
+    } else { harpoon.release=0; }
+  } else {
+    // no hit: harpoon recedes then disappears
+    if(!harpoon.grow){
+      harpoon.len -= 0.45*dt;
+      if(harpoon.len<=0){ harpoon=null; }
+    }
+    if(!pumpHeld && harpoon){ harpoon.grow=false; }
+  }
+}
+
+function popEnemy(e){
+  e.dead=true; e.state='dead';
+  // depth bonus: deeper = more points
+  const depthBonus = Math.max(0, e.r-SKY_ROWS);
+  const base = e.type==='fygar'?400:200;
+  const pts = base + depthBonus*50;
+  addScore(pts);
+  spawnBurst(e.x,e.y, e.type==='fygar'?'#ff6a3a':'#ff5a8a');
+  showFloat(pts, e.x, e.y);
+  sfx('pop');
+  onEnemyKilled();
+}
+
+// ---------- Enemy update ----------
+function updateEnemies(dt){
+  // Homing pressure: when few monsters remain or the round is dragging,
+  // survivors actively ghost-hunt the player so a round always finishes.
+  const remaining = aliveCount();
+  const sinceKill = levelTime - lastKillTime;
+  const hunt = (remaining<=2 && levelTime>2) || sinceKill>9;
+  // Authentic Dig Dug: the last lingering monster flees to the surface and escapes.
+  if(remaining===1 && sinceKill>8){
+    for(const e of enemies)
+      if(!e.dead && e.state!=='flee' && e.state!=='inflating') e.state='flee';
+  }
+  for(const e of enemies){
+    if(e.dead) continue;
+    e.anim += dt*0.2;
+
+    if(e.state==='inflating'){
+      // being pumped: hold still, deflate over time if not actively pumped
+      e.inflateT += dt;
+      if(e.inflateT>40 && (!harpoon || harpoon.hit!==e)){
+        e.inflate = Math.max(0, e.inflate-1);
+        e.inflateT=0;
+        if(e.inflate===0){ e.state='walk'; }
+      }
+      continue;
+    }
+
+    if(e.state==='flee'){
+      // disembodied-eyes escape toward the top-left surface
+      const dx=0.5-e.x, dy=(SKY_ROWS-0.6)-e.y, dist=Math.hypot(dx,dy)||1;
+      e.x += (dx/dist)*e.speed*1.5*dt; e.y += (dy/dist)*e.speed*1.5*dt;
+      if(e.y<=SKY_ROWS-0.2 || (e.x<=0.3 && e.y<=SKY_ROWS+0.6)){
+        e.dead=true; e.escaped=true; e.state='dead'; sfx('escape'); onEnemyKilled();
+      }
+      if(!player.dead && Math.abs(e.x-player.x)<0.55 && Math.abs(e.y-player.y)<0.55) killPlayer();
+      continue;
+    }
+
+    // Fygar fire breath
+    if(e.type==='fygar'){
+      e.fireCd -= dt*0.016*fygarFireFast;
+      if(e.fire>0){ e.fire -= dt*0.016; }
+      else if(e.fireCd<=0 && e.state==='walk'){
+        // breathe if player roughly in line horizontally and close
+        if(Math.abs(player.y-e.y)<0.6 &&
+           ((e.dir==='left'&&player.x<e.x)||(e.dir==='right'&&player.x>e.x)) &&
+           Math.abs(player.x-e.x)<3.2){
+          e.fire=1.0; e.fireCd=3+Math.random()*3; sfx('fire');
+          // check player caught in fire line
+          for(let i=1;i<=3;i++){
+            const fc=Math.round(e.x)+(e.dir==='left'?-i:i);
+            if(tileAt(fc,Math.round(e.y))===DIRT) break;
+            if(Math.round(player.x)===fc && Math.round(player.y)===Math.round(e.y)){
+              killPlayer();
+            }
+          }
+        } else { e.fireCd=1+Math.random()*2; }
+      }
+      if(e.fire>0) continue; // stand still while breathing
+    }
+
+    // ghost mode timer
+    e.ghostT -= dt*0.016;
+    const moving = (Math.abs(e.x-e.c)>0.001||Math.abs(e.y-e.r)>0.001);
+
+    if(e.state==='ghost'){
+      // float straight toward player through dirt
+      const tx=player.x, ty=player.y;
+      const dx=tx-e.x, dy=ty-e.y;
+      const dist=Math.hypot(dx,dy)||1;
+      e.x += (dx/dist)*e.speed*1.25*dt;
+      e.y += (dy/dist)*e.speed*1.25*dt;
+      // keep inside the field
+      e.x=Math.max(0,Math.min(COLS-1,e.x));
+      e.y=Math.max(SKY_ROWS,Math.min(ROWS-1,e.y));
+      // exit ghost when reaching an empty tile near player or timer
+      const cc=Math.round(e.x), rr=Math.round(e.y);
+      if(tileAt(cc,rr)===EMPTY && (e.ghostT<0 || dist<1.2)){
+        e.x=cc; e.y=rr; e.c=cc; e.r=rr; e.state='walk';
+        e.ghostT = 5+Math.random()*5;
+      } else if(e.ghostT < -2.5){
+        // SAFETY: overstayed ghost -> snap to nearest tunnel so it stays killable
+        const tile=findNearestEmpty(cc,rr);
+        e.x=tile.c; e.y=tile.r; e.c=tile.c; e.r=tile.r;
+        e.state='walk'; e.ghostT=5+Math.random()*5;
+      }
+    } else {
+      // tile walking, only through tunnels
+      if(!moving){
+        e.c=Math.round(e.x); e.r=Math.round(e.y);
+        // decide direction: chase player along tunnels
+        const opts=[];
+        for(const k in DIRS){
+          const d=DIRS[k]; const nc=e.c+d.x, nr=e.r+d.y;
+          if(nc<0||nc>=COLS||nr<0||nr>=ROWS) continue;
+          if(tileAt(nc,nr)===EMPTY && !rockAt(nc,nr)) opts.push(k);
+        }
+        if(opts.length){
+          // prefer direction reducing distance to player; avoid reverse unless needed
+          const rev={up:'down',down:'up',left:'right',right:'left'}[e.moveDir];
+          opts.sort((a,b)=>distAfter(e,a)-distAfter(e,b));
+          let pick = opts[0];
+          if(opts.length>1 && pick===rev) pick=opts[1];
+          if(Math.random()<0.18) pick=opts[Math.floor(Math.random()*opts.length)];
+          e.moveDir=pick; e.dir=pick;
+          const d=DIRS[pick]; e.tc=e.c+d.x; e.tr=e.r+d.y;
+        } else {
+          e.moveDir=null;
+        }
+        // chance to enter ghost mode if blocked-ish or timer up
+        if((e.ghostT<0 && Math.random()<0.5) || (hunt && Math.random()<0.05)){
+          e.state='ghost'; e.ghostT=3+Math.random()*3;
+        }
+      }
+      if(e.moveDir){
+        const d=DIRS[e.moveDir];
+        const step=e.speed*dt;
+        e.x+=d.x*step; e.y+=d.y*step;
+        if((d.x!==0&&Math.abs(e.x-e.tc)<step)||(d.y!==0&&Math.abs(e.y-e.tr)<step)){
+          e.x=e.tc; e.y=e.tr; e.c=e.tc; e.r=e.tr; e.moveDir=null;
+        }
+      }
+    }
+
+    // collision with player
+    if(!player.dead && Math.abs(e.x-player.x)<0.55 && Math.abs(e.y-player.y)<0.55){
+      killPlayer();
+    }
+  }
+}
+
+function distAfter(e,k){
+  const d=DIRS[k];
+  return Math.hypot((e.c+d.x)-player.x, (e.r+d.y)-player.y);
+}
+
+// ---------- Rocks ----------
+function updateRocks(dt){
+  for(const k of rocks){
+    if(k.gone) continue;
+    const c=Math.round(k.c), below=Math.round(k.y)+1;
+    if(!k.falling){
+      // unsupported if tile below is empty
+      if(below<ROWS && tileAt(c,below)===EMPTY){
+        k.shaking += dt;
+        if(k.shaking>40){ k.falling=true; k.vy=0; k.kills=0; sfx('rock'); }
+      } else { k.shaking=0; }
+    } else {
+      k.vy = (k.vy||0) + 0.012*dt;
+      k.y += k.vy*dt*0.06 + 0.06*dt;
+      // crush enemies (chain bonus for multiple in one drop)
+      const CHAIN=[1000,2500,4000,6000];
+      for(const e of enemies){
+        if(!e.dead && e.state!=='flee' && Math.round(e.x)===c && Math.abs(e.y-k.y)<0.7){
+          e.dead=true; e.state='dead';
+          k.kills=(k.kills||0)+1;
+          const pts=CHAIN[Math.min(k.kills-1,CHAIN.length-1)];
+          addScore(pts); spawnBurst(e.x,e.y,'#cccccc'); showFloat(pts,e.x,e.y);
+          sfx('crush'); onEnemyKilled();
+        }
+      }
+      // crush player
+      if(!player.dead && Math.round(player.x)===c && Math.abs(player.y-k.y)<0.7){
+        killPlayer();
+      }
+      // landed?
+      const land = Math.round(k.y)+1;
+      if(land>=ROWS || tileAt(c,land)===DIRT){
+        k.y=Math.round(k.y); k.falling=false; k.gone=true; // rock shatters
+        spawnBurst(c,k.y,'#8a6a44');
+        flash=4; rocksDropped++; sfx('land');
+      }
+    }
+  }
+}
+
+// ---------- Bonus vegetable (appears after 2 rocks drop) ----------
+function updateBonus(dt){
+  if(bonus){
+    bonus.t+=dt; bonus.life-=dt;
+    if(bonus.life<=0){ bonus=null; return; }
+    if(!player.dead && Math.abs(player.x-bonus.c)<0.6 && Math.abs(player.y-bonus.r)<0.6){
+      addScore(bonus.p.v); showFloat(bonus.p.v, bonus.c, bonus.r);
+      spawnBurst(bonus.c,bonus.r,bonus.p.col); sfx('bonus');
+      showMsg(bonus.p.n+'  +'+bonus.p.v, bonus.p.col);
+      bonus=null;
+    }
+  } else if(!bonusDone && rocksDropped>=2){
+    const idx=Math.min(level-1, PRODUCE.length-1);
+    const cc=Math.floor(COLS/2), rr=Math.floor((SKY_ROWS+ROWS)/2);
+    carve(cc,rr);
+    bonus={c:cc, r:rr, p:PRODUCE[idx], life:680, t:0};
+    bonusDone=true;
+  }
+}
+
+// ---------- Particles ----------
+function spawnDirt(c,r){
+  for(let i=0;i<3;i++){
+    particles.push({x:c+0.5,y:r+0.5,vx:(Math.random()-0.5)*0.04,
+      vy:(Math.random()-0.5)*0.04,life:20,col:'#7a4620',s:2});
+  }
+}
+function spawnPop(x,y,n){
+  for(let i=0;i<4;i++){
+    particles.push({x:x+0.5,y:y+0.5,vx:(Math.random()-0.5)*0.08,
+      vy:(Math.random()-0.5)*0.08,life:16,col:'#ffd', s:2});
+  }
+}
+function spawnBurst(x,y,col){
+  for(let i=0;i<16;i++){
+    const a=Math.random()*Math.PI*2, sp=0.04+Math.random()*0.12;
+    particles.push({x:x+0.5,y:y+0.5,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,
+      life:24+Math.random()*12,col,s:2+Math.random()*2});
+  }
+}
+let floats=[];
+function showFloat(pts,x,y){ floats.push({pts,x:x+0.5,y:y+0.3,life:50}); }
+
+function updateParticles(dt){
+  for(const p of particles){ p.x+=p.vx*dt; p.y+=p.vy*dt; p.life-=dt; }
+  particles=particles.filter(p=>p.life>0);
+  for(const f of floats){ f.y-=0.012*dt; f.life-=dt; }
+  floats=floats.filter(f=>f.life>0);
+}
+
+// ---------- Scoring / life ----------
+function addScore(n){ score+=n; document.getElementById('score').textContent=score; hiHud(); }
+
+// ---------- High scores (persisted locally) ----------
+const HS_KEY='digdug_highscores_v1', HS_MAX=5;
+let highscores=[];
+function loadHigh(){
+  try{ const j=localStorage.getItem(HS_KEY); highscores=j?JSON.parse(j):[]; }catch(e){ highscores=[]; }
+  if(!Array.isArray(highscores)) highscores=[];
+}
+function saveHigh(){ try{ localStorage.setItem(HS_KEY, JSON.stringify(highscores)); }catch(e){} }
+function topScore(){ return highscores.length?highscores[0].score:0; }
+function qualifies(s){ return s>0 && (highscores.length<HS_MAX || s>highscores[highscores.length-1].score); }
+function addHigh(name,s,lvl){
+  const entry={name:(name||'YOU').toUpperCase().slice(0,6), score:s, level:lvl};
+  highscores.push(entry);
+  highscores.sort((a,b)=>b.score-a.score);
+  highscores=highscores.slice(0,HS_MAX);
+  saveHigh();
+  return highscores.indexOf(entry);
+}
+function hiHud(){ document.getElementById('hi').textContent='HI '+Math.max(topScore(),score); }
+function highTableHTML(hl){
+  if(!highscores.length)
+    return '<div class="hs"><div class="hstitle">HIGH SCORES</div>'+
+           '<div class="hsempty">No scores yet — be the first!</div></div>';
+  const rows=highscores.map((h,i)=>
+    '<div class="hsrow'+(i===hl?' hsnew':'')+'">'+
+      '<span class="hsrank">'+(i+1)+'</span>'+
+      '<span class="hsname">'+h.name+'</span>'+
+      '<span class="hsscore">'+h.score+'</span></div>').join('');
+  return '<div class="hs"><div class="hstitle">HIGH SCORES</div>'+rows+'</div>';
+}
+function aliveCount(){ return enemies.filter(e=>!e.dead).length; }
+function updateMonsterHud(){
+  const n=aliveCount();
+  document.getElementById('mons').textContent = n>0 ? ' 👾×'+n : ' CLEAR!';
+}
+function onEnemyKilled(){ lastKillTime=levelTime; updateMonsterHud(); }
+function setLives(){
+  document.getElementById('lives').textContent='♥'.repeat(Math.max(0,lives))||'—';
+}
+
+function killPlayer(){
+  if(player.dead || player.invuln>0) return;
+  player.dead=true;
+  spawnBurst(player.x,player.y,'#ffd34d');
+  flash=6; sfx('death'); stopMusic();
+  setTimeout(()=>{
+    lives--; setLives();
+    if(lives<0){ gameOver(); }
+    else { respawn(); }
+  }, 700);
+}
+
+function respawn(){
+  const pc=Math.floor(COLS/2), pr=SKY_ROWS+1;
+  player.c=pc; player.r=pr; player.x=pc; player.y=pr;
+  player.dir='down'; player.moveDir=null; player.dead=false;
+  player.invuln=170;            // brief spawn protection (~2.8s) to move clear
+  carve(pc,pr);
+  harpoon=null;
+
+  // Monsters are NOT moved — they stay where they are and keep chasing. Your
+  // brief spawn invulnerability (the blinking) is what protects you if one
+  // happens to be close when you reappear, so you can move away safely.
+  enemies.forEach(e=>{
+    if(e.dead) return;
+    e.fire=0;
+    if(e.state==='flee') e.state='walk';
+  });
+}
+
+// ---------- Game flow ----------
+function startGame(){
+  initAudio();
+  document.getElementById('overlay').classList.add('hidden');
+  score=0; lives=3; level=1;
+  addScore(0); setLives();
+  startLevel();
+}
+function startLevel(){
+  document.getElementById('level').textContent='RD '+level;
+  resize();
+  buildLevel();
+  running=true; paused=false;
+  levelTime=0; lastKillTime=0;
+  flash=0; msg=null;
+  updateMonsterHud();
+  lastTime=performance.now();
+}
+function nextLevel(){
+  level++;
+  showMsg('ROUND CLEAR!', '#7ad1ff');
+  paused=true; stopMusic(); sfx('clear');
+  setTimeout(()=>{ startLevel(); }, 1400);
+}
+function gameOver(){
+  running=false;
+  const ov=document.getElementById('overlay');
+  ov.classList.remove('hidden');
+  if(qualifies(score)){
+    ov.innerHTML='<h1>NEW HIGH SCORE!</h1>'+
+      '<p class="big">'+score+'</p>'+
+      '<p>Enter your initials:</p>'+
+      '<input id="initials" maxlength="6" value="YOU" autocomplete="off" spellcheck="false">'+
+      '<button class="btn" id="saveBtn">SAVE</button>';
+    const inp=document.getElementById('initials');
+    setTimeout(()=>{ inp.focus(); inp.select(); }, 50);
+    const save=()=>{
+      const idx=addHigh(inp.value, score, level);
+      hiHud();
+      showFinalOver(idx);
+    };
+    document.getElementById('saveBtn').addEventListener('click', save);
+    inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); save(); }});
+  } else {
+    showFinalOver(-1);
+  }
+}
+function showFinalOver(hl){
+  const ov=document.getElementById('overlay');
+  ov.classList.remove('hidden');
+  ov.innerHTML='<h1>GAME OVER</h1>'+
+    '<p class="big">Score: '+score+'</p>'+
+    '<p>You reached Round '+level+'.</p>'+
+    highTableHTML(hl)+
+    '<button class="btn" id="againBtn">PLAY AGAIN</button>';
+  document.getElementById('againBtn').addEventListener('click', startGame);
+}
+function showMsg(text,col){ msg={text,col}; msgT=90; }
+
+// ---------- Main loop ----------
+function loop(now){
+  requestAnimationFrame(loop);
+  let dt=(now-lastTime)/16.67;
+  lastTime=now;
+  if(dt>3) dt=3; // clamp after tab switch
+  if(running && !paused){
+    levelTime += dt/60;   // approx seconds
+    updatePlayer(dt);
+    updateHarpoon(dt);
+    updateEnemies(dt);
+    updateRocks(dt);
+    updateBonus(dt);
+    updateParticles(dt);
+    musicTick(dt, !!player.moveDir && !player.dead);
+    if(flash>0) flash-=dt;
+    if(msgT>0) msgT-=dt;
+    // win check
+    if(enemies.length && enemies.every(e=>e.dead)){
+      paused=true; nextLevel();
+    }
+  } else { updateParticles(dt); if(msgT>0) msgT-=dt; }
+  draw();
+}
+
+// ---------- Rendering ----------
+const STRATA=[ // each band: top & bottom color for vertical gradient
+  ['#b9742f','#9c5d23'], ['#a85f8f','#8c4a76'],
+  ['#5f86c4','#46679e'], ['#c79a3c','#a87e28'],
+  ['#4f9d6b','#3a7d52'], ['#b9742f','#9c5d23']
+];
+let strataCache=null, strataKey='';
+
+function buildStrata(){
+  // pre-render the full dirt field (with texture) to an offscreen canvas
+  const off=document.createElement('canvas');
+  off.width=canvas.width; off.height=canvas.height;
+  const o=off.getContext('2d');
+  const bandH=3; // rows per strata band
+  for(let r=SKY_ROWS;r<ROWS;r++){
+    const band=STRATA[Math.floor((r-SKY_ROWS)/bandH)%STRATA.length];
+    const g=o.createLinearGradient(0,r*TILE,0,(r+1)*TILE);
+    g.addColorStop(0,band[0]); g.addColorStop(1,band[1]);
+    o.fillStyle=g; o.fillRect(0,r*TILE,canvas.width,TILE);
+  }
+  // pebble / speckle texture
+  let seed=12345; const rnd=()=>{seed=(seed*9301+49297)%233280;return seed/233280;};
+  for(let i=0;i<canvas.width*ROWS/22;i++){
+    const px=rnd()*canvas.width, py=SKY_ROWS*TILE+rnd()*(canvas.height-SKY_ROWS*TILE);
+    const sz=1+rnd()*2.4;
+    o.fillStyle=rnd()<0.5?'rgba(0,0,0,0.16)':'rgba(255,255,255,0.10)';
+    o.beginPath(); o.arc(px,py,sz,0,7); o.fill();
+  }
+  strataCache=off;
+}
+
+function draw(){
+  const W=canvas.width, H=canvas.height, t=performance.now();
+  if(!grid){ return; }
+
+  // ----- sky -----
+  const sky=ctx.createLinearGradient(0,0,0,SKY_ROWS*TILE);
+  sky.addColorStop(0,'#10243f'); sky.addColorStop(1,'#2c4a6e');
+  ctx.fillStyle=sky; ctx.fillRect(0,0,W,SKY_ROWS*TILE);
+  // stars
+  ctx.fillStyle='rgba(255,255,255,0.7)';
+  for(let i=0;i<10;i++){
+    const sx=((i*97)%W), sy=((i*53)%(SKY_ROWS*TILE-6))+3;
+    const tw=0.4+0.6*Math.abs(Math.sin(t*0.002+i));
+    ctx.globalAlpha=tw; ctx.fillRect(sx,sy,1.5,1.5);
+  }
+  ctx.globalAlpha=1;
+
+  // ----- dirt field (cached) -----
+  if(!strataCache || strataKey!==(W+'x'+H)){ buildStrata(); strataKey=W+'x'+H; }
+  ctx.drawImage(strataCache,0,0);
+
+  // grass lip along the top of the dirt
+  ctx.fillStyle='#4f9d3a';
+  ctx.fillRect(0,SKY_ROWS*TILE-3,W,5);
+  ctx.fillStyle='#3c7d2c';
+  for(let x=0;x<W;x+=6){ ctx.fillRect(x,SKY_ROWS*TILE-5,3,4); }
+
+  // ----- carve smooth tunnels -----
+  carveTunnels();
+
+  // particles behind actors
+  for(const p of particles){
+    ctx.globalAlpha=Math.min(1,p.life/20);
+    ctx.fillStyle=p.col;
+    ctx.beginPath(); ctx.arc(p.x*TILE,p.y*TILE,p.s,0,7); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  for(const k of rocks){ if(!k.gone) drawRock(k,t); }
+  drawBonus(t);
+  drawHarpoon();
+  for(const e of enemies){ if(!e.dead) drawEnemy(e,t); }
+  if(!player.dead) drawPlayer(t);
+
+  // floats
+  ctx.textAlign='center'; ctx.font='bold '+Math.floor(TILE*0.5)+'px system-ui';
+  for(const f of floats){
+    ctx.globalAlpha=Math.min(1,f.life/30);
+    ctx.fillStyle='#fff'; ctx.strokeStyle='rgba(0,0,0,0.6)'; ctx.lineWidth=3;
+    ctx.strokeText(f.pts, f.x*TILE, f.y*TILE);
+    ctx.fillText(f.pts, f.x*TILE, f.y*TILE);
+  }
+  ctx.globalAlpha=1;
+
+  // vignette
+  const vig=ctx.createRadialGradient(W/2,H/2,H*0.3,W/2,H/2,H*0.75);
+  vig.addColorStop(0,'rgba(0,0,0,0)'); vig.addColorStop(1,'rgba(0,0,0,0.35)');
+  ctx.fillStyle=vig; ctx.fillRect(0,0,W,H);
+
+  if(flash>0){ ctx.fillStyle='rgba(255,255,255,'+(flash/14)+')'; ctx.fillRect(0,0,W,H); }
+
+  if(msgT>0 && msg){
+    ctx.globalAlpha=Math.min(1,msgT/30);
+    ctx.textAlign='center';
+    ctx.font='bold '+Math.floor(TILE*1.1)+'px system-ui';
+    ctx.lineWidth=6; ctx.strokeStyle='rgba(0,0,0,0.7)';
+    ctx.strokeText(msg.text, W/2, H/2);
+    ctx.fillStyle=msg.col; ctx.fillText(msg.text, W/2, H/2);
+    ctx.globalAlpha=1;
+  }
+}
+
+// Smooth, connected tunnels: fill empty tiles as rounded capsules + connectors,
+// then add a soft inner shadow rim so dirt edges look carved.
+function carveTunnels(){
+  const tun='#191007';
+  ctx.save();
+  ctx.fillStyle=tun;
+  const rad=TILE*0.42, half=TILE/2;
+  // connectors between adjacent empties (so channels merge smoothly)
+  ctx.beginPath();
+  for(let r=SKY_ROWS;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      if(grid[r][c]!==EMPTY) continue;
+      const cx=c*TILE+half, cy=r*TILE+half;
+      // node
+      ctx.moveTo(cx+rad,cy); ctx.arc(cx,cy,rad,0,7);
+      // right neighbour
+      if(c+1<COLS && grid[r][c+1]===EMPTY){
+        ctx.rect(cx, cy-rad, TILE, rad*2);
+      }
+      // down neighbour
+      if(r+1<ROWS && grid[r+1][c]===EMPTY){
+        ctx.rect(cx-rad, cy, rad*2, TILE);
+      }
+    }
+  }
+  ctx.fill();
+  // soft top highlight inside tunnels for depth
+  ctx.globalCompositeOperation='lighter';
+  for(let r=SKY_ROWS;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      if(grid[r][c]!==EMPTY) continue;
+      const cx=c*TILE+half, cy=r*TILE+half;
+      const g=ctx.createRadialGradient(cx,cy-rad*0.4,1,cx,cy,rad*1.1);
+      g.addColorStop(0,'rgba(120,90,60,0.18)'); g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx,cy,rad,0,7); ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function drawBonus(t){
+  if(!bonus) return;
+  if(bonus.life<120 && Math.floor(t*0.012)%2===0) return; // blink before vanishing
+  const x=bonus.c*TILE+TILE/2, y=bonus.r*TILE+TILE/2, s=TILE;
+  ctx.save();
+  ctx.translate(x, y+Math.sin(t*0.005)*s*0.05);
+  const gg=ctx.createRadialGradient(0,0,2,0,0,s*0.62);
+  gg.addColorStop(0,'rgba(255,255,200,0.5)'); gg.addColorStop(1,'rgba(255,255,200,0)');
+  ctx.fillStyle=gg; ctx.beginPath(); ctx.arc(0,0,s*0.62,0,7); ctx.fill();
+  ctx.fillStyle=bonus.p.col;
+  ctx.beginPath(); ctx.ellipse(0,s*0.06,s*0.26,s*0.3,0,0,7); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,0.35)';
+  ctx.beginPath(); ctx.ellipse(-s*0.08,-s*0.02,s*0.07,s*0.11,0,0,7); ctx.fill();
+  // leaves
+  ctx.fillStyle='#3fae3a';
+  ctx.beginPath(); ctx.ellipse(-s*0.08,-s*0.26,s*0.1,s*0.06,-0.6,0,7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(s*0.08,-s*0.26,s*0.1,s*0.06,0.6,0,7); ctx.fill();
+  ctx.fillStyle='#2c7d28'; ctx.fillRect(-s*0.02,-s*0.3,s*0.04,s*0.13);
+  ctx.restore();
+}
+
+function drawRock(k,t){
+  const x=k.c*TILE, y=k.y*TILE;
+  const sh = (k.shaking>0 && !k.falling) ? Math.sin(t*0.05)*2 : 0;
+  ctx.save();
+  ctx.translate(x+TILE/2+sh, y+TILE/2);
+  const R=TILE*0.42;
+  const g=ctx.createRadialGradient(-R*0.3,-R*0.4,R*0.2,0,0,R*1.2);
+  g.addColorStop(0,'#b9bcc6'); g.addColorStop(0.6,'#7d8089'); g.addColorStop(1,'#4f525a');
+  ctx.fillStyle=g;
+  roundRectC(0,0,R*2,R*1.9,R*0.45); ctx.fill();
+  // cracks
+  ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=Math.max(1,TILE*0.04);
+  ctx.beginPath(); ctx.moveTo(-R*0.2,-R*0.7); ctx.lineTo(0,0); ctx.lineTo(-R*0.4,R*0.6); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(R*0.5,-R*0.5); ctx.lineTo(R*0.1,0.1); ctx.stroke();
+  ctx.restore();
+}
+
+function drawHarpoon(){
+  if(!harpoon) return;
+  const px=player.x*TILE+TILE/2, py=player.y*TILE+TILE/2;
+  const tx=harpoon.tip.x*TILE+TILE/2, ty=harpoon.tip.y*TILE+TILE/2;
+  ctx.save();
+  ctx.lineCap='round';
+  // glow
+  ctx.strokeStyle='rgba(255,230,150,0.35)'; ctx.lineWidth=Math.max(4,TILE*0.22);
+  ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(tx,ty); ctx.stroke();
+  // cord
+  ctx.strokeStyle='#f2efe6'; ctx.lineWidth=Math.max(2,TILE*0.09);
+  ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(tx,ty); ctx.stroke();
+  // spear head
+  const d=DIRS[harpoon.dir], ang=Math.atan2(d.y,d.x);
+  ctx.translate(tx,ty); ctx.rotate(ang);
+  ctx.fillStyle='#ffe9a8';
+  ctx.beginPath(); ctx.moveTo(TILE*0.22,0); ctx.lineTo(-TILE*0.1,TILE*0.13);
+  ctx.lineTo(-TILE*0.1,-TILE*0.13); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+function drawPlayer(t){
+  if(player.invuln>0 && Math.floor(t*0.018)%2===0) return; // blink while protected
+  const x=player.x*TILE+TILE/2, y=player.y*TILE+TILE/2, s=TILE;
+  const moving = !!player.moveDir;
+  const bob = moving ? Math.sin(t*0.02)*s*0.04 : 0;
+  const legSwing = moving ? Math.sin(t*0.02)*s*0.12 : 0;
+  const faceL = player.dir==='left'?-1:(player.dir==='right'?1:0);
+  ctx.save();
+  ctx.translate(x, y+bob);
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,0.3)';
+  ctx.beginPath(); ctx.ellipse(0,s*0.4,s*0.3,s*0.1,0,0,7); ctx.fill();
+  // legs
+  ctx.strokeStyle='#2a2a2a'; ctx.lineWidth=Math.max(2,s*0.09); ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(-s*0.12,s*0.18); ctx.lineTo(-s*0.12+legSwing,s*0.38); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(s*0.12,s*0.18); ctx.lineTo(s*0.12-legSwing,s*0.38); ctx.stroke();
+  // body (white suit) with shading
+  const bg=ctx.createLinearGradient(0,-s*0.3,0,s*0.25);
+  bg.addColorStop(0,'#ffffff'); bg.addColorStop(1,'#cfd6e0');
+  ctx.fillStyle=bg;
+  roundRect(-s*0.3,-s*0.22,s*0.6,s*0.46,s*0.16); ctx.fill();
+  // pump nozzle in facing dir
+  if(faceL!==0){
+    ctx.fillStyle='#3a3a3a';
+    ctx.fillRect(faceL>0?s*0.24:-s*0.4, -s*0.02, s*0.16, s*0.1);
+  } else {
+    ctx.fillStyle='#3a3a3a';
+    ctx.fillRect(-s*0.05, player.dir==='up'?-s*0.42:s*0.22, s*0.1, s*0.16);
+  }
+  // helmet
+  const hg=ctx.createLinearGradient(0,-s*0.42,0,-s*0.18);
+  hg.addColorStop(0,'#ff6b6b'); hg.addColorStop(1,'#d62f2f');
+  ctx.fillStyle=hg;
+  roundRect(-s*0.28,-s*0.42,s*0.56,s*0.26,s*0.12); ctx.fill();
+  // helmet light
+  ctx.fillStyle='#fff7c8';
+  ctx.beginPath(); ctx.arc(faceL*s*0.18,-s*0.3,s*0.05,0,7); ctx.fill();
+  // goggles / eyes
+  ctx.fillStyle='#1c2533';
+  roundRect(-s*0.2+faceL*s*0.04,-s*0.16,s*0.4,s*0.14,s*0.06); ctx.fill();
+  ctx.fillStyle='#7fd8ff';
+  ctx.beginPath(); ctx.arc(faceL*s*0.1,-s*0.09,s*0.04,0,7); ctx.fill();
+  ctx.restore();
+}
+
+function drawEnemy(e,t){
+  const x=e.x*TILE+TILE/2, y=e.y*TILE+TILE/2, s=TILE;
+  const ghost = e.state==='ghost' || e.state==='flee';
+  const wob = Math.sin(t*0.012 + e.x)*s*0.03;
+  ctx.save();
+  ctx.translate(x, y+ (ghost?wob:0));
+  const inf = 1 + e.inflate*0.26;
+  const r = s*0.36*inf;
+  const faceL = e.dir==='left'?-1:1;
+  if(ghost){
+    // bright pulsing aura so a monster phasing through dirt is easy to spot
+    const pulse=0.5+0.5*Math.sin(t*0.012);
+    const ga=ctx.createRadialGradient(0,0,r*0.3,0,0,r*1.9);
+    ga.addColorStop(0,'rgba(150,255,200,'+(0.55+0.25*pulse)+')');
+    ga.addColorStop(1,'rgba(120,255,180,0)');
+    ctx.fillStyle=ga;
+    ctx.beginPath(); ctx.arc(0,0,r*1.9,0,7); ctx.fill();
+    ctx.globalAlpha=0.85;
+  }
+
+  // shadow
+  if(!ghost){ ctx.fillStyle='rgba(0,0,0,0.28)';
+    ctx.beginPath(); ctx.ellipse(0,r*0.95,r*0.8,r*0.22,0,0,7); ctx.fill(); }
+
+  if(e.type==='fygar'){
+    const bg=ctx.createLinearGradient(0,-r,0,r);
+    bg.addColorStop(0, ghost?'#aef0c2':'#4cd874'); bg.addColorStop(1, ghost?'#7fd79a':'#2ba14f');
+    // tail/wing spikes
+    ctx.fillStyle=ghost?'#9be8b3':'#39b863';
+    for(let i=-1;i<=1;i++){ ctx.beginPath();
+      ctx.moveTo(-faceL*r*0.6, i*r*0.4-r*0.2);
+      ctx.lineTo(-faceL*r*1.15, i*r*0.4); ctx.lineTo(-faceL*r*0.6, i*r*0.4+r*0.2);
+      ctx.closePath(); ctx.fill(); }
+    // body
+    ctx.fillStyle=bg;
+    roundRectC(0,0,r*2.0,r*1.7,r*0.55); ctx.fill();
+    // belly
+    ctx.fillStyle=ghost?'#eafff0':'#dffbe6';
+    roundRectC(faceL*r*0.15,r*0.22,r*1.1,r*0.85,r*0.4); ctx.fill();
+    // eye
+    drawEye(faceL*r*0.5,-r*0.5,r*0.3,faceL);
+    // nostril + fire
+    if(e.fire>0){
+      const dir=faceL;
+      for(let i=1;i<=4;i++){
+        const fr=TILE*0.32*(1.3-i*0.12)*(0.8+0.4*Math.sin(t*0.05+i));
+        const grd=ctx.createRadialGradient(dir*(r*1.1+i*TILE*0.55),0,1,dir*(r*1.1+i*TILE*0.55),0,fr);
+        grd.addColorStop(0,'rgba(255,245,150,0.95)');
+        grd.addColorStop(0.5,'rgba(255,140,30,0.85)');
+        grd.addColorStop(1,'rgba(220,40,20,0)');
+        ctx.fillStyle=grd;
+        ctx.beginPath(); ctx.arc(dir*(r*1.1+i*TILE*0.55),0,fr,0,7); ctx.fill();
+      }
+    }
+  } else {
+    // pooka
+    const bg=ctx.createRadialGradient(-r*0.3,-r*0.3,r*0.2,0,0,r*1.1);
+    bg.addColorStop(0, ghost?'#ffb3bd':'#ff6b6b'); bg.addColorStop(1, ghost?'#ff8a98':'#e01f1f');
+    ctx.fillStyle=bg;
+    ctx.beginPath(); ctx.arc(0,0,r,0,7); ctx.fill();
+    // goggles band
+    ctx.strokeStyle=ghost?'#ffe9b0':'#ffd24d'; ctx.lineWidth=r*0.16;
+    ctx.beginPath(); ctx.arc(0,-r*0.05,r*0.72,Math.PI*0.95,Math.PI*2.05); ctx.stroke();
+    // goggle eyes
+    ctx.fillStyle='#ffe04d';
+    ctx.beginPath(); ctx.arc(-r*0.38,-r*0.12,r*0.36,0,7); ctx.fill();
+    ctx.beginPath(); ctx.arc(r*0.38,-r*0.12,r*0.36,0,7); ctx.fill();
+    drawPupil(-r*0.38,-r*0.12,r*0.18,faceL);
+    drawPupil(r*0.38,-r*0.12,r*0.18,faceL);
+  }
+
+  if(e.inflate>0 && e.inflate<4){
+    ctx.strokeStyle='rgba(255,255,255,0.55)'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(0,0,r*1.02,0.3,1.1); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0,0,r*1.02,3.4,4.2); ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawEye(cx,cy,r,faceL){
+  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(cx,cy,r,0,7); ctx.fill();
+  ctx.fillStyle='#101010'; ctx.beginPath(); ctx.arc(cx+faceL*r*0.35,cy,r*0.5,0,7); ctx.fill();
+}
+function drawPupil(cx,cy,r,faceL){
+  ctx.fillStyle='#101010'; ctx.beginPath(); ctx.arc(cx+faceL*r*0.3,cy,r,0,7); ctx.fill();
+}
+
+// rounded rect helpers
+function roundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+function roundRectC(cx,cy,w,h,r){ roundRect(cx-w/2,cy-h/2,w,h,r); }
+
+// ---------- Audio (synthesized via Web Audio API) ----------
+let AC=null, masterGain=null, muted=false;
+function initAudio(){
+  if(AC){ if(AC.state==='suspended') AC.resume(); return; }
+  try{
+    AC=new (window.AudioContext||window.webkitAudioContext)();
+    masterGain=AC.createGain();
+    masterGain.gain.value=muted?0:0.5;
+    masterGain.connect(AC.destination);
+  }catch(e){ AC=null; }
+}
+function blip(freq,dur,type,vol,glideTo){
+  if(!AC||muted) return;
+  const t=AC.currentTime, o=AC.createOscillator(), g=AC.createGain();
+  o.type=type||'square'; o.frequency.setValueAtTime(freq,t);
+  if(glideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20,glideTo),t+dur);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(vol||0.3,t+0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g); g.connect(masterGain); o.start(t); o.stop(t+dur+0.03);
+}
+function noise(dur,vol){
+  if(!AC||muted) return;
+  const t=AC.currentTime, n=Math.floor(AC.sampleRate*dur);
+  const buf=AC.createBuffer(1,n,AC.sampleRate), d=buf.getChannelData(0);
+  for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*(1-i/n);
+  const src=AC.createBufferSource(); src.buffer=buf;
+  const g=AC.createGain(); g.gain.value=vol||0.2;
+  src.connect(g); g.connect(masterGain); src.start(t);
+}
+let lastDig=0;
+function sfx(name){
+  if(!AC||muted) return;
+  switch(name){
+    case 'dig':{ const now=performance.now(); if(now-lastDig<70) return; lastDig=now; noise(0.05,0.07); break; }
+    case 'shoot': blip(660,0.08,'square',0.18,990); break;
+    case 'pump':  blip(300,0.12,'sawtooth',0.22,560); break;
+    case 'pop':   blip(190,0.25,'square',0.3,55); noise(0.12,0.14); break;
+    case 'rock':  blip(220,0.5,'sine',0.18,80); break;
+    case 'land':  noise(0.18,0.28); blip(90,0.18,'square',0.22,45); break;
+    case 'crush': blip(150,0.3,'square',0.33,45); noise(0.15,0.18); break;
+    case 'fire':  noise(0.25,0.16); blip(440,0.25,'sawtooth',0.13,170); break;
+    case 'bonus': [523,659,784,1047].forEach((f,i)=>setTimeout(()=>blip(f,0.12,'square',0.24),i*70)); break;
+    case 'death': [440,392,330,247,196].forEach((f,i)=>setTimeout(()=>blip(f,0.2,'triangle',0.3),i*120)); break;
+    case 'clear': [523,659,784,1047,880,1175].forEach((f,i)=>setTimeout(()=>blip(f,0.14,'square',0.26),i*120)); break;
+    case 'escape': blip(820,0.3,'sine',0.2,200); break;
+  }
+}
+// Signature Dig Dug touch: the walking tune only plays while the player moves.
+const MELODY=[262,294,330,349,392,349,330,294];
+let mStep=0, mTimer=0;
+function musicTick(dt,moving){
+  if(!AC||muted){ return; }
+  if(!moving){ mTimer=0; return; }
+  mTimer-=dt;
+  if(mTimer<=0){
+    mTimer=14;
+    const f=MELODY[mStep%MELODY.length];
+    blip(f,0.12,'triangle',0.15); blip(f/2,0.12,'sine',0.09);
+    mStep++;
+  }
+}
+function stopMusic(){ mStep=0; mTimer=0; }
+function toggleMute(){
+  muted=!muted;
+  if(masterGain) masterGain.gain.value=muted?0:0.5;
+  document.getElementById('mute').textContent=muted?'🔇':'🔊';
+}
+document.getElementById('mute').addEventListener('click', ()=>{ initAudio(); toggleMute(); });
+
+// ---------- Boot ----------
+loadHigh();
+hiHud();
+document.getElementById('hsBox').innerHTML = highTableHTML(-1);
+resize();
+draw();
+requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
