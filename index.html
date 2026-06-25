@@ -71,7 +71,7 @@
   #touch{
     width:100%; max-width:720px; flex:1; display:flex; align-items:center;
     justify-content:space-between; gap:8px;
-    padding:10px clamp(8px,3vw,22px) 20px; min-height:0; overflow:hidden;
+    padding:8px clamp(8px,3vw,22px) 12px; min-height:0; overflow:hidden;
   }
   #dpad{position:relative; width:clamp(108px,40vw,168px); aspect-ratio:1/1;
     flex:0 0 auto; touch-action:none;}
@@ -173,15 +173,18 @@ const DIRS = {
 
 // ---------- Responsive sizing ----------
 function resize(){
-  const stage = document.getElementById('stage');
   const hud = document.getElementById('hud').offsetHeight;
+  const hintEl = document.getElementById('hint');
   const touchEl = document.getElementById('touch');
   const isTouch = getComputedStyle(touchEl).display !== 'none';
-  const touchH = isTouch ? touchEl.offsetHeight + 40 : 60;
-  const availW = Math.min(window.innerWidth - 8, 720);
-  const availH = window.innerHeight - hud - touchH - 24;
+  // Reserve only what the controls actually take (was padded heavily before),
+  // so the play area can claim the rest of the screen.
+  const touchH = isTouch ? touchEl.offsetHeight + 8 : 12;
+  const hintH = (hintEl && getComputedStyle(hintEl).display!=='none') ? hintEl.offsetHeight : 0;
+  const availW = Math.min(window.innerWidth - 4, 1100);
+  const availH = window.innerHeight - hud - touchH - hintH - 10;
   let t = Math.floor(Math.min(availW / COLS, availH / ROWS));
-  t = Math.max(14, Math.min(t, 40));
+  t = Math.max(14, Math.min(t, 60));  // allow much larger tiles on phones/tablets
   TILE = t;
   canvas.width = COLS*TILE;
   canvas.height = ROWS*TILE;
