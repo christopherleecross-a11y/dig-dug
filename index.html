@@ -29,8 +29,11 @@
   #lives{color:#ff7a7a;}
   #level{color:#7ad1ff;}
   #mons{color:#9bf06b; font-size:13px;}
-  #mute{background:none; border:none; cursor:pointer; font-size:18px; padding:0 2px;
+  #mute,#modeBtn{background:none; border:none; cursor:pointer; font-size:18px; padding:0 2px;
     line-height:1; filter:saturate(.9);}
+  #touch.fingermode #dpad{display:none;}
+  #touch.fingermode{justify-content:flex-start;}
+  @media (min-width:860px){ #modeBtn{display:none;} }
   /* high score table */
   .hs{ width:100%; max-width:300px; margin:2px auto 0; }
   .hstitle{ color:#ffd34d; font-weight:800; letter-spacing:3px; margin-bottom:6px; font-size:15px;}
@@ -73,12 +76,14 @@
     justify-content:space-between; gap:8px;
     padding:6px clamp(8px,3vw,22px) 10px; min-height:0; overflow:hidden;
   }
-  #dpad{position:relative; width:clamp(92px,30vw,132px); aspect-ratio:1/1;
+  /* Wider than tall: buttons get bigger horizontally without adding height
+     (height drives the control-bar size, so the game isn't shrunk). */
+  #dpad{position:relative; width:clamp(150px,50vw,220px); height:clamp(92px,26vw,132px);
     flex:0 0 auto; touch-action:none;}
   .dbtn{
-    position:absolute; width:33.34%; height:33.34%; background:rgba(255,255,255,.12);
-    border:2px solid rgba(255,255,255,.28); border-radius:12px; display:flex;
-    align-items:center; justify-content:center; font-size:clamp(14px,4vw,20px); color:#fff;
+    position:absolute; width:34%; height:33.34%; background:rgba(255,255,255,.14);
+    border:2px solid rgba(255,255,255,.3); border-radius:12px; display:flex;
+    align-items:center; justify-content:center; font-size:clamp(16px,4.5vw,22px); color:#fff;
   }
   .dbtn:active,.dbtn.on{background:rgba(255,211,77,.5);}
   #up{top:0; left:33.33%;} #down{bottom:0; left:33.33%;}
@@ -101,14 +106,14 @@
   <div id="hud">
     <div class="seg"><span id="score">0</span><span id="hi">HI 0</span></div>
     <div class="seg"><span id="level">RD 1</span><span id="mons"></span></div>
-    <div class="seg"><span id="lives">♥♥♥</span><button id="mute" title="Sound on/off">🔊</button></div>
+    <div class="seg"><span id="lives">♥♥♥</span><button id="modeBtn" title="Control: D-pad / finger">🕹️</button><button id="mute" title="Sound on/off">🔊</button></div>
   </div>
   <div id="stage">
     <canvas id="game"></canvas>
     <div id="overlay">
       <h1>DIG DUG</h1>
       <p>Dig tunnels through the dirt. Pump up monsters until they pop, or drop rocks to crush them. Clear every monster to advance.</p>
-      <p style="color:#9ec4ff">PC: Arrow keys / WASD to move · Space to pump<br>Phone: D‑pad to move · PUMP button</p>
+      <p style="color:#9ec4ff">PC: Arrow keys / WASD to move · Space to pump<br>Phone: D‑pad or touch the field to move · PUMP button<br>Tap 🕹️/👆 (top bar) to switch control · pinch to zoom</p>
       <div id="hsBox"></div>
       <button class="btn" id="startBtn">START</button>
     </div>
@@ -211,9 +216,9 @@ function buildLevel(){
   bonus = null; rocksDropped = 0; bonusDone = false;
 
   // ----- per-round difficulty -----
-  // Slow on round 1, then steadily faster every round.
-  speedMul     = Math.min(0.65 + (level-1)*0.11, 1.9);  // monsters get faster
-  fygarFireFast= Math.min(0.8 + (level-1)*0.12, 2.2);    // Fygars breathe more
+  // Slow on round 1, then gradually faster every round (gentle ramp).
+  speedMul     = Math.min(0.65 + (level-1)*0.06, 1.9);  // monsters get faster
+  fygarFireFast= Math.min(0.8 + (level-1)*0.07, 2.2);    // Fygars breathe more
 
   // player start: center column, near top of dirt
   const pc = Math.floor(COLS/2), pr = SKY_ROWS+1;
@@ -301,6 +306,7 @@ function findNearestEmpty(c,r){
 const keys = {};
 const held = {up:false,down:false,left:false,right:false};
 let pumpHeld = false;
+let touchControl = false;   // false = D-pad, true = steer by touching the field
 
 window.addEventListener('keydown', e=>{
   // don't hijack typing in a text field (e.g. high-score initials)
@@ -562,13 +568,15 @@ function updateEnemies(dt){
       }
     } else {
       // tile walking, only through tunnels
+      // keep monsters out of the open sky strip at the very top
+      if(e.y<SKY_ROWS){ e.y=SKY_ROWS; e.r=SKY_ROWS; }
       if(!moving){
         e.c=Math.round(e.x); e.r=Math.round(e.y);
-        // decide direction: chase player along tunnels
+        // decide direction: chase player along tunnels (never up into the sky)
         const opts=[];
         for(const k in DIRS){
           const d=DIRS[k]; const nc=e.c+d.x, nr=e.r+d.y;
-          if(nc<0||nc>=COLS||nr<0||nr>=ROWS) continue;
+          if(nc<0||nc>=COLS||nr<SKY_ROWS||nr>=ROWS) continue;
           if(tileAt(nc,nr)===EMPTY && !rockAt(nc,nr)) opts.push(k);
         }
         if(opts.length){
@@ -769,7 +777,8 @@ function respawn(){
   enemies.forEach(e=>{
     if(e.dead) return;
     e.fire=0;
-    if(e.state==='flee') e.state='walk';
+    // pull any monster that strayed into the sky back onto the dirt line
+    if(e.y<SKY_ROWS){ e.y=SKY_ROWS; e.r=SKY_ROWS; e.state='walk'; e.moveDir=null; }
   });
 }
 
@@ -1285,6 +1294,19 @@ function applyZoom(){
 function resetZoom(){ zoom=1; panX=0; panY=0; canvas.style.transform=''; }
 function canvasXY(t){ const r=canvas.getBoundingClientRect(); return {x:t.clientX-r.left, y:t.clientY-r.top}; }
 
+// Steer the player toward wherever the finger is (zoom/pan aware).
+function fingerSteer(touch){
+  if(!running || paused || player.dead) return;
+  const p=canvasXY(touch);
+  const fx=(p.x/zoom)/TILE, fy=(p.y/zoom)/TILE;     // finger position in tiles
+  const dx=fx-(player.x+0.5), dy=fy-(player.y+0.5);
+  held.up=held.down=held.left=held.right=false;
+  if(Math.max(Math.abs(dx),Math.abs(dy))<0.4) return; // deadzone near player
+  if(Math.abs(dx)>Math.abs(dy)){ if(dx>0) held.right=true; else held.left=true; }
+  else { if(dy>0) held.down=true; else held.up=true; }
+}
+function fingerRelease(){ held.up=held.down=held.left=held.right=false; }
+
 let pinch=null, drag=null;
 canvas.addEventListener('touchstart', e=>{
   if(e.touches.length===2){
@@ -1294,8 +1316,10 @@ canvas.addEventListener('touchstart', e=>{
     const r=canvas.getBoundingClientRect();
     const mx=(a.clientX+b.clientX)/2-r.left, my=(a.clientY+b.clientY)/2-r.top;
     pinch={ d, z:zoom, cx:(mx-panX)/zoom, cy:(my-panY)/zoom }; drag=null;
-  } else if(e.touches.length===1 && zoom>1){
-    const p=canvasXY(e.touches[0]); drag={x:p.x,y:p.y,panX,panY};
+    if(touchControl) fingerRelease();
+  } else if(e.touches.length===1){
+    if(touchControl){ e.preventDefault(); fingerSteer(e.touches[0]); }
+    else if(zoom>1){ const p=canvasXY(e.touches[0]); drag={x:p.x,y:p.y,panX,panY}; }
   }
 }, {passive:false});
 canvas.addEventListener('touchmove', e=>{
@@ -1308,11 +1332,14 @@ canvas.addEventListener('touchmove', e=>{
     zoom=Math.min(3.2, Math.max(1, pinch.z * d/pinch.d));
     panX=mx-pinch.cx*zoom; panY=my-pinch.cy*zoom;
     applyZoom();
-  } else if(e.touches.length===1 && drag && zoom>1){
-    e.preventDefault();
-    const p=canvasXY(e.touches[0]);
-    panX=drag.panX+(p.x-drag.x); panY=drag.panY+(p.y-drag.y);
-    applyZoom();
+  } else if(e.touches.length===1){
+    if(touchControl){ e.preventDefault(); fingerSteer(e.touches[0]); }
+    else if(drag && zoom>1){
+      e.preventDefault();
+      const p=canvasXY(e.touches[0]);
+      panX=drag.panX+(p.x-drag.x); panY=drag.panY+(p.y-drag.y);
+      applyZoom();
+    }
   }
 }, {passive:false});
 let lastTap=0;
@@ -1320,11 +1347,25 @@ canvas.addEventListener('touchend', e=>{
   if(e.touches.length<2) pinch=null;
   if(e.touches.length===0){
     drag=null;
+    if(touchControl) fingerRelease();
     const now=Date.now();
-    if(now-lastTap<300) resetZoom();   // double-tap resets
+    if(now-lastTap<300) resetZoom();   // double-tap resets zoom
     lastTap=now;
   }
 }, {passive:false});
+
+// ---------- Control mode toggle (D-pad vs finger) ----------
+function setMode(finger){
+  touchControl=finger;
+  held.up=held.down=held.left=held.right=false;
+  document.getElementById('touch').classList.toggle('fingermode', finger);
+  document.getElementById('modeBtn').textContent = finger?'👆':'🕹️';
+  document.getElementById('modeBtn').title = finger
+    ? 'Touch the field to move (tap to switch to D-pad)'
+    : 'D-pad control (tap to switch to finger)';
+  try{ localStorage.setItem('digdug_mode', finger?'finger':'dpad'); }catch(e){}
+}
+document.getElementById('modeBtn').addEventListener('click', ()=> setMode(!touchControl));
 // desktop: wheel to zoom toward cursor, drag to pan when zoomed
 canvas.addEventListener('wheel', e=>{
   e.preventDefault();
@@ -1341,6 +1382,7 @@ window.addEventListener('mouseup', ()=>{ mdrag=null; });
 
 // ---------- Boot ----------
 loadHigh();
+try{ setMode(localStorage.getItem('digdug_mode')==='finger'); }catch(e){ setMode(false); }
 hiHud();
 document.getElementById('hsBox').innerHTML = highTableHTML(-1);
 resize();
