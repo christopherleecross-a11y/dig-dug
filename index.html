@@ -69,29 +69,30 @@
   .hidden{display:none !important;}
   /* touch controls */
   #touch{
-    width:100%; max-width:720px; flex:1; display:flex; align-items:center;
+    width:100%; max-width:720px; display:flex; align-items:center;
     justify-content:space-between; gap:8px;
-    padding:8px clamp(8px,3vw,22px) 12px; min-height:0; overflow:hidden;
+    padding:6px clamp(8px,3vw,22px) 10px; min-height:0; overflow:hidden;
   }
-  #dpad{position:relative; width:clamp(108px,40vw,168px); aspect-ratio:1/1;
+  #dpad{position:relative; width:clamp(92px,30vw,132px); aspect-ratio:1/1;
     flex:0 0 auto; touch-action:none;}
   .dbtn{
     position:absolute; width:33.34%; height:33.34%; background:rgba(255,255,255,.12);
-    border:2px solid rgba(255,255,255,.28); border-radius:14px; display:flex;
-    align-items:center; justify-content:center; font-size:clamp(15px,5vw,24px); color:#fff;
+    border:2px solid rgba(255,255,255,.28); border-radius:12px; display:flex;
+    align-items:center; justify-content:center; font-size:clamp(14px,4vw,20px); color:#fff;
   }
   .dbtn:active,.dbtn.on{background:rgba(255,211,77,.5);}
   #up{top:0; left:33.33%;} #down{bottom:0; left:33.33%;}
   #left{left:0; top:33.33%;} #right{right:0; top:33.33%;}
   #pump{
-    width:clamp(76px,26vw,108px); aspect-ratio:1/1; flex:0 0 auto; border-radius:50%;
+    width:clamp(62px,19vw,86px); aspect-ratio:1/1; flex:0 0 auto; border-radius:50%;
     background:radial-gradient(circle at 35% 30%,#ff9a5a,#e2502a);
-    border:3px solid #ffb98a; color:#fff; font-size:17px; font-weight:800;
+    border:3px solid #ffb98a; color:#fff; font-size:clamp(12px,3.4vw,15px); font-weight:800;
     display:flex; align-items:center; justify-content:center; text-align:center;
-    box-shadow:0 5px 0 #9c3216; line-height:1.1;
+    box-shadow:0 4px 0 #9c3216; line-height:1.1;
   }
-  #pump:active,#pump.on{transform:translateY(3px); box-shadow:0 2px 0 #9c3216;}
-  #hint{font-size:12px; color:#9c8d77; text-align:center; padding:2px 0 8px;}
+  #pump:active,#pump.on{transform:translateY(3px); box-shadow:0 1px 0 #9c3216;}
+  #hint{font-size:11px; color:#9c8d77; text-align:center; padding:1px 0 5px;}
+  @media (max-width:859px){ #hint{display:none;} }   /* save space on phones */
   @media (min-width:860px){ #touch{display:none;} }
 </style>
 </head>
@@ -129,7 +130,7 @@
 "use strict";
 
 // ---------- Grid config ----------
-const COLS = 14, ROWS = 18;      // playfield in tiles
+const COLS = 11, ROWS = 18;      // playfield in tiles (fewer cols = bigger tiles)
 const SKY_ROWS = 2;              // top rows are open sky (no dirt)
 let TILE = 28;                   // pixel size, recomputed responsively
 
