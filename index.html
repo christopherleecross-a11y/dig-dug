@@ -210,8 +210,9 @@ function buildLevel(){
   bonus = null; rocksDropped = 0; bonusDone = false;
 
   // ----- per-round difficulty -----
-  speedMul     = Math.min(1 + (level-1)*0.09, 1.75);   // monsters get faster
-  fygarFireFast= Math.min(1 + (level-1)*0.12, 2.2);    // Fygars breathe more
+  // Slow on round 1, then steadily faster every round.
+  speedMul     = Math.min(0.65 + (level-1)*0.11, 1.9);  // monsters get faster
+  fygarFireFast= Math.min(0.8 + (level-1)*0.12, 2.2);    // Fygars breathe more
 
   // player start: center column, near top of dirt
   const pc = Math.floor(COLS/2), pr = SKY_ROWS+1;
